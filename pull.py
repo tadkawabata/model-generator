@@ -1,14 +1,16 @@
 # stockmodel pull.py
 # pulls numbers straight from sec filings and prints a clean table
-#   python pull.py check            can we reach the sec
-#   python pull.py latest klic      newest 10q or 10k
-#   python pull.py table klic       every model row, csv, plus main stuff and checks
+#   python pull.py check --ua "stockmodel you@email.com"            can we reach the sec
+#   python pull.py latest klic --ua "stockmodel you@email.com"      newest 10q or 10k
+#   python pull.py table klic --ua "stockmodel you@email.com"       every model row, csv, plus main stuff and checks
+# the sec wants a contact email on every request. it goes in --ua (or a SEC_UA environment variable)
+# nothing personal is saved in this file, so the repo stays clean
 # standard library only. $ millions, eps per share, shares in millions
 
-import sys, json, csv, gzip, time, urllib.request, urllib.error
+import os, sys, json, csv, gzip, time, urllib.request, urllib.error
 from datetime import date, timedelta
 
-ua = "your name your@email.com"  # sec wants your real name and email here
+ua = os.environ.get("SEC_UA", "")  # set from --ua in main()
 
 M = 1_000_000
 _last = [0.0]
@@ -16,8 +18,8 @@ _last = [0.0]
 
 def get(url):
     # one request to the sec, stays under 10 a second
-    if ua == "your name your@email.com" or "@" not in ua:
-        sys.exit("stop: put your name and email in the ua line at the top of pull.py (sec requires it)")
+    if "@" not in ua:
+        sys.exit('stop: the sec needs a contact email. add --ua "stockmodel you@email.com" to the command')
     wait = 0.15 - (time.time() - _last[0])
     if wait > 0:
         time.sleep(wait)
@@ -531,7 +533,13 @@ def check():
 
 
 def main():
+    global ua
     a = sys.argv[1:]
+    if "--ua" in a:
+        i = a.index("--ua")
+        if i + 1 < len(a):
+            ua = a[i + 1]
+        a = a[:i] + a[i + 2:]
     try:
         if a[:1] == ["check"]:
             check()
@@ -540,10 +548,10 @@ def main():
         elif len(a) == 2 and a[0] == "table":
             table(a[1])
         else:
-            sys.exit("use: python pull.py check | latest <ticker> | table <ticker>")
+            sys.exit('use: python pull.py check | latest <ticker> | table <ticker>, plus --ua "stockmodel you@email.com"')
     except urllib.error.HTTPError as e:
         sys.exit(f"blocked: sec said {e.code} {e.reason} for {e.url}. "
-                 "403 usually means the ua line is missing or the sec domains arent allowed")
+                 "403 usually means --ua is missing an email or the sec domains arent allowed")
     except urllib.error.URLError as e:
         sys.exit(f"blocked: cant reach the sec ({e.reason}). add data.sec.gov and www.sec.gov to allowed domains")
 
