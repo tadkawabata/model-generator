@@ -1,7 +1,3 @@
----
-name: stockmodel
-description: builds and updates a shkreli style main and model google sheet for one stock from sec filings. use when i say run stockmodel, set up a ticker, or update the model
----
 
 # stockmodel
 
