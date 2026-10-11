@@ -16,7 +16,8 @@ claude reads this file and walks you through it
 ## setup
 1. download stockmodel.zip from this repo (click it, then the download button). dont unzip it
    githubs green code > download zip wont work as a skill, its folder has the wrong name
-2. claude.ai settings > capabilities > code execution: turn on network egress, add data.sec.gov and www.sec.gov to allowed domains
+2. claude.ai settings > capabilities > code execution: turn on network egress, add data.sec.gov, www.sec.gov and raw.githubusercontent.com to allowed domains
+   (the last one lets claude grab pull.py from this repo if the skill upload only kept SKILL.md)
 3. claude > customize > skills > upload a skill, pick the zip
 4. install claude for google workspace from the google workspace marketplace
 5. open example.xlsx in google sheets once to see whats what

@@ -7,7 +7,11 @@ description: builds and updates a shkreli style main and model google sheet for 
 
 one google sheet per company. tabs: main, model, log. layout.md has every row and column
 python moves the numbers, you read the text and quote it, checks run before anything counts
-pull.py sits next to this file. run it from this folder
+pull.py and layout.md sit next to this file. run pull.py from this folder
+some installs only keep SKILL.md. if pull.py or layout.md is missing, download both before doing anything else:
+https://raw.githubusercontent.com/tadkawabata/models/main/pull.py
+https://raw.githubusercontent.com/tadkawabata/models/main/layout.md
+if that download is blocked, tell me to add raw.githubusercontent.com to allowed domains, same place as the sec ones
 
 ## sec contact
 the sec wants a contact email on every request. nothing personal is saved in these files
