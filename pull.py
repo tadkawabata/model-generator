@@ -368,8 +368,9 @@ def table(ticker):
             x_sti = x
         w.writerow([name, r1(x["val"]) if x else 0, x["end"] if x else "",
                     f"{x['tag']} {x['accn']}" if x else "none tagged, check the balance sheet"])
-    debt, dsrc, dend = debt_total(facts)
-    w.writerow(["debt", r1(debt) if debt is not None else 0, dend, dsrc])
+    asof = x_cash["end"] if x_cash else max(c["end"] for c in cols).isoformat()
+    debt, dsrc, dend = debt_total(facts, asof)
+    w.writerow(["debt", r1(debt) if debt is not None else "", dend, dsrc])
     dates = {"cash": x_cash, "st investments": x_sti}
 
     # checks
@@ -385,25 +386,19 @@ def table(ticker):
                         "take it from the newest 10q balance sheet"])
 
 
-def debt_total(facts):
-    tot = instant(facts, ["LongTermDebt"])
+def debt_total(facts, asof):
+    # only debt tagged on the newest balance sheet counts. an old tag from years ago means nothing now
+    cur = lambda t: (lambda x: x if x and x["end"] == asof else None)(instant(facts, [t]))
     parts = []
+    tot = cur("LongTermDebt")
     if tot:
         parts.append(tot)
     else:
-        for t in ["LongTermDebtNoncurrent", "LongTermDebtCurrent"]:
-            x = instant(facts, [t])
-            if x:
-                parts.append(x)
-    for t in ["ShortTermBorrowings", "CommercialPaper"]:
-        x = instant(facts, [t])
-        if x:
-            parts.append(x)
+        parts += [x for x in (cur("LongTermDebtNoncurrent"), cur("LongTermDebtCurrent")) if x]
+    parts += [x for x in (cur("ShortTermBorrowings"), cur("CommercialPaper")) if x]
     if not parts:
-        return None, "none tagged, check the balance sheet", ""
-    newest = max(p["end"] for p in parts)
-    parts = [p for p in parts if p["end"] == newest]  # only add up values from the same date
-    return sum(p["val"] for p in parts), " + ".join(f"{p['tag']} {p['accn']}" for p in parts), newest
+        return None, f"no debt tagged on the {asof} balance sheet. check it, no borrowings means 0", asof
+    return sum(p["val"] for p in parts), " + ".join(f"{p['tag']} {p['accn']}" for p in parts), asof
 
 
 def label(c):
@@ -476,8 +471,9 @@ def checks(S, cols, years, sub, facts):
         if c["kind"] == "q" and wk != 13:
             out.append(["weeks", "flag", f"{L} is {wk} weeks. year over year looks off"])
 
-    # 4 q1 + q2 + q3 equals the 9 month ytd, 5 fy equals its 4 quarters
-    for y in years:
+    # 4 q1 + q2 + q3 equals the 9 month ytd, 5 fy equals its 4 quarters. only years in the sheet
+    first = min(c["start"] for c in cols)
+    for y in [y for y in years if y["end"] is None or y["end"] >= first]:
         qs = {q["n"]: q for q in quarters(S, y)}
         for r in ["revenue", "operating income", "net income"]:
             ser = S[r]

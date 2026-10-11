@@ -42,7 +42,7 @@ main b8 is cash plus st investments added together
 
 when a check says missing or newest filing fail, that quarter isnt fully in the sec xbrl api yet or the company switched tags. read those numbers from the 10q itself, quote each one in a cell note, and say so in the log
 when main as of dates are older than the newest quarter, take cash, investments and debt from the newest 10q balance sheet with quotes
-debt says none tagged: check the balance sheet. no borrowings means 0, and say so in the c cell
+debt comes back blank (no debt tagged on the newest balance sheet): check the balance sheet. no borrowings means 0, and say so in the c cell
 
 ## checks you do in the sheet (pull.py does 1 to 5, 7 and 9)
 6. segment rows and end market rows each sum to revenue, within 0.5
