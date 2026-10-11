@@ -26,12 +26,14 @@ the sec wants a contact email on every request. nothing personal is saved in the
    nothing new: say nothing new since <period>, refresh the price snapshot, stop
    something new: keep going
 4. python pull.py table <ticker> --ua "stockmodel <email>"  then write the numbers into new or missing columns
-5. read the filing text only for what xbrl doesnt have: segment and end market revenue, backlog, next quarter guidance from the 8k press release, a 2 or 3 line business description, customers, products, competitors. every number you get this way gets a cell note with the exact quote and the filing link
+5. read the filing text only for what xbrl doesnt have: segment and end market revenue, backlog, next quarter guidance from the 8k press release, a 2 or 3 line business description, customers, products, competitors. every number you get this way gets a cell note with the exact quote and the filing link. anything that changes how to read it goes in the visible note column
 6. price snapshot: put =GOOGLEFINANCE(ticker) in a scratch cell, read it, write the plain number into main b5 with todays date in c5, delete the scratch cell. if that fails ask me for the price
-7. run the checks, write results to the log tab, mark anything that fails, never hide it
-8. tell me in the sidebar what changed in plain words. no buy or sell calls, just what moved and what failed
+7. format every tab the way layout.md says (readable without clicking). do this every run, also on sheets built before these rules
+8. run the checks, write results to the log tab, mark anything that fails, never hide it
+9. tell me in the sidebar what changed in plain words. no buy or sell calls, just what moved and what failed
 
 if i say run stockmodel check, just run python pull.py check with the --ua and tell me the result
+if i say run stockmodel format, only redo the formatting from layout.md on this sheet. no sec pull, no new numbers. move long text out of the way the layout says: sources become short linked labels, caveats move to the note column, text rows go across b:e. never delete a cell i typed. if something i typed is in the way, ask me
 
 ## reading pull.py table
 it prints csv in 3 blocks with a blank line between them
@@ -42,11 +44,11 @@ it prints csv in 3 blocks with a blank line between them
 numbers are already $ millions to 1 decimal, eps 2 decimals, shares millions. write them as they are
 ratio rows in the csv are just for reading. in the sheet they are formulas from layout.md
 segments, end markets, backlog, guidance come out blank. thats step 5
-main b8 is cash plus st investments added together
+main b8 is cash plus st investments added together, with the split in e8
 
 when a check says missing or newest filing fail, that quarter isnt fully in the sec xbrl api yet or the company switched tags. read those numbers from the 10q itself, quote each one in a cell note, and say so in the log
 when main as of dates are older than the newest quarter, take cash, investments and debt from the newest 10q balance sheet with quotes
-debt comes back blank (no debt tagged on the newest balance sheet): check the balance sheet. no borrowings means 0, and say so in the c cell
+debt comes back blank (no debt tagged on the newest balance sheet): check the balance sheet. no borrowings means 0, and say so in e9
 
 ## checks you do in the sheet (pull.py does 1 to 5, 7 and 9)
 6. segment rows and end market rows each sum to revenue, within 0.5
@@ -62,6 +64,7 @@ put all of them in the log row for the run. anything that fails: color the cell 
 4. $ millions to 1 decimal, eps to 2 decimals, shares in millions
 5. if pull.py cant reach the sec, stop and walk me through the fix below. never guess numbers
 6. no buy or sell calls
+7. i should be able to read every tab without clicking into cells. follow the readable without clicking rules in layout.md
 
 ## if the sidebar cant reach the sec
 1. pull.py check says blocked or 403: claude.ai settings > capabilities > code execution, turn on network egress, add data.sec.gov and www.sec.gov to allowed domains

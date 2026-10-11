@@ -23,6 +23,7 @@ claude reads this file and walks you through it
 5. open example.xlsx in google sheets once to see whats what
 6. new blank google sheet > extensions > claude > open claude > say run stockmodel check, then set up klic (or any ticker)
 7. after that just open the sheet and say run stockmodel. keep the sidebar open while it works
+8. sheet looks messy or was built before a layout change? say run stockmodel format. it only tidies, no new numbers
 
 ## your email
 the sec wants a contact email on every request, so claude asks for one at the start of a run
