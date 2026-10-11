@@ -54,7 +54,7 @@ put all of them in the log row for the run. anything that fails: color the cell 
 2. it says put your name and email: the ua line at the top of pull.py still has the placeholder. paste the repo link into claude again, give it a name and email, upload the new zip
 3. still blocked (the sidebar is new and might ignore that setting): plan b, i run python pull.py table <ticker> > <ticker>.csv on my laptop or in claude code, drop the csv into the sidebar, and you fill the sheet from it the same way
 
-## things that bite
+## things to note
 1. fiscal labels are the companys fiscal quarters, not calendar. trust the fiscal label row from pull.py
 2. q4 has no 10q. its the fiscal year minus the 9 month ytd, so kind says derived quarter
 3. 14 week quarters happen. weeks row shows it and checks flag it
