@@ -61,12 +61,18 @@ TAGS = {
     "capex": ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
 }
 
-# what the csv prints, in sheet order. blank rows come from the filing text, claude fills them
+# what the csv prints, in sheet order, with the exact labels the template uses
+# segments, end markets, backlog and guidance come from the filing text, claude fills them
 OUT = ["revenue", "revenue y/y", "cogs", "gross profit", "gross margin", "sga", "r&d",
        "other operating items", "operating income", "operating margin", "interest and other",
        "pretax income", "taxes", "tax rate", "net income", "diluted shares", "eps",
-       "cfo", "capex", "fcf", "segments", "end markets", "backlog", "guidance"]
-TEXT_ROWS = {"segments", "end markets", "backlog", "guidance"}
+       "cfo", "capex", "fcf"]
+SHOW = {"revenue": "Revenue", "revenue y/y": "Revenue Y/Y", "cogs": "COGS", "gross profit": "Gross profit",
+        "gross margin": "Gross margin", "sga": "SG&A", "r&d": "R&D", "other operating items": "Other operating items",
+        "operating income": "Operating income", "operating margin": "Operating margin",
+        "interest and other": "Interest and other", "pretax income": "Pretax income", "taxes": "Taxes",
+        "tax rate": "Tax rate", "net income": "Net income", "diluted shares": "Diluted shares", "eps": "EPS",
+        "cfo": "CFO", "capex": "Capex", "fcf": "FCF"}
 
 
 def periodic(x):
@@ -94,6 +100,7 @@ def series(facts, tags):
                     first[k] = x
         for k in got:
             got[k]["orig"] = first[k]["accn"]  # the filing where this period was new
+            got[k]["orig_form"] = first[k]["form"]
         for k, x in got.items():
             out.setdefault(k, x)
     return out
@@ -187,16 +194,16 @@ def flow(ser, q):
     # quarter value: the 3 month fact, or ytd minus last ytd (q4 = fy minus 9 month ytd)
     x = ser.get((q["start"], q["end"]))
     if x:
-        return x["val"], x["orig"], False
+        return x["val"], {"accn": x["orig"], "form": x["orig_form"]}, False
     cur = ser.get((q["fystart"], q["end"]))
     if not cur:
         return None, None, False
     if q["n"] == 1:
-        return cur["val"], cur["orig"], False
+        return cur["val"], {"accn": cur["orig"], "form": cur["orig_form"]}, False
     prior = ser.get((q["fystart"], q["prev_end"]))
     if not prior:
         return None, None, False
-    return cur["val"] - prior["val"], f"{cur['orig']} minus {prior['orig']}", True
+    return cur["val"] - prior["val"], {"accn": cur["orig"], "form": cur["orig_form"], "less": prior["orig"]}, True
 
 
 def build(S, cols):
@@ -210,7 +217,7 @@ def build(S, cols):
                 x = S[r].get((c["start"], c["end"]))
                 v[r] = x["val"] if x else None
                 if x:
-                    src[r] = x["orig"]
+                    src[r] = {"accn": x["orig"], "form": x["orig_form"]}
             else:
                 v[r], src[r], der = flow(S[r], c["q"])
                 if der and r in ("revenue", "net income"):
@@ -325,65 +332,73 @@ def table(ticker):
         v["tax rate"] = ratio(v["taxes"], v["pretax income"])
 
     w = csv.writer(sys.stdout, lineterminator="\n")
-    w.writerow(["model", ticker.lower(), title.lower()])
-    w.writerow(["fiscal label"] + [label(c) for c in cols])
-    w.writerow(["period end"] + [c["end"].isoformat() for c in cols])
-    w.writerow(["weeks"] + [round(((c["end"] - c["start"]).days + 1) / 7) for c in cols])
-    w.writerow(["kind"] + [kind(c) for c in cols])
-    w.writerow(["source"] + [source(c) for c in cols])
+    srcs = [source(c, cik) for c in cols]
+    w.writerow(["Model", ticker.upper(), nice(title)])
+    w.writerow(["Fiscal label"] + [label(c) for c in cols])
+    w.writerow(["Period end"] + [c["end"].isoformat() for c in cols])
+    w.writerow(["Weeks"] + [round(((c["end"] - c["start"]).days + 1) / 7) for c in cols])
+    w.writerow(["Kind"] + [kind(c) for c in cols])
+    w.writerow(["Source"] + [s[0] for s in srcs])
+    w.writerow(["Link"] + [s[1] for s in srcs])
+    w.writerow(["Accession"] + [s[2] for s in srcs])
     for r in OUT:
-        row = [r]
+        row = [SHOW[r]]
         for c in cols:
             x = c["v"].get(r)
-            if r in TEXT_ROWS:
-                row.append("")
-            elif r in ("revenue y/y", "gross margin", "operating margin", "tax rate"):
+            if r in ("revenue y/y", "gross margin", "operating margin", "tax rate"):
                 row.append(x)
             elif r == "eps":
                 row.append("" if x is None else round(x, 2))
             else:
                 row.append(r1(x))
         w.writerow(row)
-    w.writerow(["approx"] + [" ".join(sorted(c["approx"])) for c in cols])
+    w.writerow(["Approx"] + [", ".join(SHOW[a] for a in sorted(c["approx"])) for c in cols])
 
     # main stuff
     w.writerow([])
-    w.writerow(["main", "value", "as of", "source"])
-    w.writerow(["ticker", ticker.lower(), "", ""])
-    w.writerow(["company", title.lower(), "", ""])
-    w.writerow(["cik", cik, "", ""])
+    w.writerow(["Main", "Value", "As of", "Source", "Link", "Detail"])
+    w.writerow(["Ticker", ticker.upper(), "", "", "", ""])
+    w.writerow(["Company", nice(title), "", "SEC", "", "Write it the way the 10-K cover does"])
+    w.writerow(["CIK", cik, "", "SEC", "", ""])
     fye = sub.get("fiscalYearEnd") or ""
-    w.writerow(["fiscal year end", f"{fye[:2]}/{fye[2:]}" if len(fye) == 4 else fye, "", "sec submissions"])
+    w.writerow(["Fiscal year end", f"{int(fye[:2])}/{int(fye[2:])}" if len(fye) == 4 else fye, "", "SEC", "", ""])
     sh = instant(facts, ["EntityCommonStockSharesOutstanding"], "dei")
-    w.writerow(["shares out", r1(sh["val"], 3) if sh else "", sh["end"] if sh else "",
-                f"dei {sh['tag']} {sh['accn']}" if sh else "not tagged, read the 10q cover"])
-    for name, tags in [("cash", ["CashAndCashEquivalentsAtCarryingValue",
+    if sh:
+        w.writerow(["Shares out", r1(sh["val"], 3), sh["end"], filing_label(sh) + " cover", link(cik, sh["accn"]),
+                    f"dei:{sh['tag']} {sh['accn']}"])
+    else:
+        w.writerow(["Shares out", "", "", "", "", "Not tagged (often multiple share classes). Read the 10-Q cover"])
+    found = {}
+    for name, tags in [("Cash", ["CashAndCashEquivalentsAtCarryingValue",
                                  "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents"]),
-                       ("st investments", ["ShortTermInvestments", "MarketableSecuritiesCurrent",
+                       ("ST investments", ["ShortTermInvestments", "MarketableSecuritiesCurrent",
                                            "AvailableForSaleSecuritiesDebtSecuritiesCurrent"])]:
-        x = instant(facts, tags)
-        if name == "cash":
-            x_cash = x
+        x = found[name] = instant(facts, tags)
+        if x:
+            w.writerow([name, r1(x["val"]), x["end"], filing_label(x), link(cik, x["accn"]), f"us-gaap:{x['tag']} {x['accn']}"])
         else:
-            x_sti = x
-        w.writerow([name, r1(x["val"]) if x else 0, x["end"] if x else "",
-                    f"{x['tag']} {x['accn']}" if x else "none tagged, check the balance sheet"])
+            w.writerow([name, 0, "", "", "", "None tagged. Check the balance sheet"])
+    x_cash = found["Cash"]
     asof = x_cash["end"] if x_cash else max(c["end"] for c in cols).isoformat()
-    debt, dsrc, dend = debt_total(facts, asof)
-    w.writerow(["debt", r1(debt) if debt is not None else "", dend, dsrc])
-    dates = {"cash": x_cash, "st investments": x_sti}
+    debt, parts = debt_total(facts, asof)
+    if parts:
+        w.writerow(["Debt", r1(debt), asof, filing_label(parts[0]), link(cik, parts[0]["accn"]),
+                    " + ".join(f"us-gaap:{p['tag']}" for p in parts) + f" {parts[0]['accn']}"])
+    else:
+        w.writerow(["Debt", "", asof, "", "", "No debt tagged on the newest balance sheet. Check it; no borrowings means 0"])
+    dates = found
 
     # checks
     w.writerow([])
-    w.writerow(["check", "result", "detail"])
+    w.writerow(["Check", "Result", "Detail"])
     for row in checks(S, cols, years, sub, facts):
         w.writerow(row)
     # 9 main as of dates vs the newest quarter
     newest = max(c["end"] for c in cols).isoformat()
     for name, x in dates.items():
         if x and x["end"] < newest:
-            w.writerow(["9 main as of", "flag", f"{name} is from {x['end']} but the newest quarter ends {newest}. "
-                        "take it from the newest 10q balance sheet"])
+            w.writerow(["9 Main as of", "Flag", f"{name} is from {x['end']} but the newest quarter ends {newest}. "
+                        "Take it from the newest 10-Q balance sheet"])
 
 
 def debt_total(facts, asof):
@@ -397,24 +412,57 @@ def debt_total(facts, asof):
         parts += [x for x in (cur("LongTermDebtNoncurrent"), cur("LongTermDebtCurrent")) if x]
     parts += [x for x in (cur("ShortTermBorrowings"), cur("CommercialPaper")) if x]
     if not parts:
-        return None, f"no debt tagged on the {asof} balance sheet. check it, no borrowings means 0", asof
-    return sum(p["val"] for p in parts), " + ".join(f"{p['tag']} {p['accn']}" for p in parts), asof
+        return None, []
+    return sum(p["val"] for p in parts), parts
+
+
+def nice(t):
+    # sec titles come in all caps sometimes. claude fixes brand styling (eg BioCryst) from the 10k cover
+    return t.title() if t.isupper() else t
+
+
+def fyl(fy):
+    return f"FY{str(fy)[-2:]}"
 
 
 def label(c):
-    yy = str(c["fy"])[-2:]
-    return f"fy{yy}" if c["kind"] == "fy" else f"q{c['q']['n']} fy{yy}"
+    return fyl(c["fy"]) if c["kind"] == "fy" else f"Q{c['q']['n']} {fyl(c['fy'])}"
 
 
 def kind(c):
     if c["kind"] == "fy":
-        return "fiscal year"
-    return "derived quarter" if c["derived"] else "quarter"
+        return "Fiscal year"
+    return "Derived quarter" if c["derived"] else "Quarter"
 
 
-def source(c):
-    s = c["src"].get("net income") or c["src"].get("revenue") or ""
-    return s
+def link(cik, accn):
+    return f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{accn.replace('-', '')}/"
+
+
+def form_of(f):
+    return "10-K" if f.startswith("10-K") else "10-Q"
+
+
+def filing_label(x):
+    # short name for the filing a balance sheet or cover value came from, eg 10-Q Q2 FY26
+    form, fy, fp = form_of(x.get("form", "")), x.get("fy"), x.get("fp")
+    if not fy:
+        return form
+    return f"10-K {fyl(fy)}" if form == "10-K" or fp == "FY" else f"10-Q {fp} {fyl(fy)}"
+
+
+def source(c, cik):
+    # short label, link, accession(s) for a model column
+    s = c["src"].get("net income") or c["src"].get("revenue")
+    if not s:
+        return "", "", ""
+    form = form_of(s["form"])
+    if c["kind"] == "q" and "less" in s:
+        lab = f"{form} {fyl(c['fy'])} less Q{c['q']['n'] - 1}"
+        acc = f"{s['accn']} less {s['less']}"
+    else:
+        lab, acc = f"{form} {label(c)}", s["accn"]
+    return lab, link(cik, s["accn"]), acc
 
 
 def checks(S, cols, years, sub, facts):
@@ -433,43 +481,43 @@ def checks(S, cols, years, sub, facts):
     if lat:
         col = next((c for c in cols if c["end"].isoformat() == lat["period"]), None)
         if col and col["v"]["revenue"] is not None and col["v"]["net income"] is not None:
-            out.append(["newest filing", "ok", f"{lat['form']} for {lat['period']} is in the data"])
+            out.append(["Newest filing", "OK", f"{lat['form']} for {lat['period']} is in the data"])
         else:
-            out.append(["newest filing", "fail", f"{lat['form']} {lat['accn']} for {lat['period']} isnt fully in the sec "
-                        "xbrl api yet or uses other tags. read the filing for that quarter"])
+            out.append(["Newest filing", "Fail", f"{lat['form']} {lat['accn']} for {lat['period']} isn't fully in the SEC "
+                        "XBRL API yet or uses other tags. Read the filing for that quarter"])
 
     for c in cols:
         v, L = c["v"], label(c)
         # holes in core rows
         miss = [r for r in ["revenue", "gross profit", "operating income", "net income"] if v.get(r) is None]
         if miss:
-            out.append(["missing", "fail", f"{L}: {', '.join(miss)} not in the sec api for this period. read the filing"])
+            out.append(["Missing", "Fail", f"{L}: {', '.join(SHOW[m] for m in miss)} not in the SEC API for this period. Read the filing"])
         # 1 gross profit ties
         if v["gp tagged"] and v["cogs tagged"] and v["revenue"] is not None:
             ok = near(v["revenue"] - v["cogs"], v["gross profit"], tol(v["revenue"], v["cogs"], v["gross profit"]))
-            out.append(["1 gross profit", "ok" if ok else "fail",
-                        f"{L}: revenue minus cogs vs reported {r1(v['gross profit'])}"])
+            out.append(["1 Gross profit ties", "OK" if ok else "Fail",
+                        f"{L}: revenue minus COGS vs reported {r1(v['gross profit'])}"])
         # 2 net income ties
         if None not in (v["pretax income"], v["taxes"], v["net income"]):
             gap = v["pretax income"] - v["taxes"] - v["net income"]
             ok = abs(gap) <= tol(v["pretax income"], v["taxes"], v["net income"])
-            out.append(["2 net income", "ok" if ok else "flag",
+            out.append(["2 Net income ties", "OK" if ok else "Flag",
                         f"{L}: pretax minus taxes vs net income, gap {r1(gap)}"
-                        + ("" if ok else ". minority interest or discontinued ops?")])
+                        + ("" if ok else ". Minority interest or discontinued ops?")])
         # 3 eps
         if v["eps"] is not None and v["net income"] is not None and v["diluted shares"] and "eps" not in c["approx"]:
             calc = v["net income"] / v["diluted shares"]
-            out.append(["3 eps", "ok" if abs(calc - v["eps"]) <= 0.02 else "fail",
+            out.append(["3 EPS", "OK" if abs(calc - v["eps"]) <= 0.02 else "Fail",
                         f"{L}: reported {round(v['eps'], 2)} vs net income over shares {round(calc, 2)}"])
         # 7 big one offs
         o = v["other operating items"]
         if o is not None and v["revenue"] and abs(o) > 0.05 * abs(v["revenue"]):
-            out.append(["7 other operating items", "flag",
-                        f"{L}: {r1(o)} is {round(100 * abs(o) / abs(v['revenue']))}% of revenue. one off, read the filing"])
+            out.append(["7 One-off", "Flag",
+                        f"{L}: other operating items of {r1(o)} are {round(100 * abs(o) / abs(v['revenue']))}% of revenue. Read the filing"])
         # weeks
         wk = round(((c["end"] - c["start"]).days + 1) / 7)
         if c["kind"] == "q" and wk != 13:
-            out.append(["weeks", "flag", f"{L} is {wk} weeks. year over year looks off"])
+            out.append(["Weeks", "Flag", f"{L} is {wk} weeks, so year over year is distorted"])
 
     # 4 q1 + q2 + q3 equals the 9 month ytd, 5 fy equals its 4 quarters. only years in the sheet
     first = min(c["start"] for c in cols)
@@ -483,16 +531,16 @@ def checks(S, cols, years, sub, facts):
                 if ytd and all(direct):
                     tot = sum(x["val"] for x in direct)
                     ok = near(tot, ytd["val"], tol(ytd["val"], *[x["val"] for x in direct]))
-                    out.append(["4 nine month ytd", "ok" if ok else "fail",
-                                f"fy{str(y['fy'])[-2:]} {r}: q1+q2+q3 {r1(tot)} vs ytd {r1(ytd['val'])}"
-                                + ("" if ok else ". something got restated")])
+                    out.append(["4 Nine-month YTD", "OK" if ok else "Fail",
+                                f"{fyl(y['fy'])} {SHOW[r].lower()}: Q1+Q2+Q3 {r1(tot)} vs YTD {r1(ytd['val'])}"
+                                + ("" if ok else ". Something was restated")])
             if y["end"] and len(qs) == 4:
                 full = ser.get((y["start"], y["end"]))
                 parts = [flow(ser, qs[n])[0] for n in (1, 2, 3, 4)]
                 if full and None not in parts:
                     ok = near(sum(parts), full["val"], tol(full["val"], *parts))
-                    out.append(["5 fiscal year", "ok" if ok else "fail",
-                                f"fy{str(y['fy'])[-2:]} {r}: 4 quarters {r1(sum(parts))} vs fy {r1(full['val'])}"])
+                    out.append(["5 Fiscal year sums", "OK" if ok else "Fail",
+                                f"{fyl(y['fy'])} {SHOW[r].lower()}: 4 quarters {r1(sum(parts))} vs FY {r1(full['val'])}"])
     return out
 
 
@@ -500,7 +548,7 @@ def latest_filing(sub):
     r = sub["filings"]["recent"]
     for i, form in enumerate(r["form"]):
         if form in ("10-Q", "10-K"):
-            return {"form": form.replace("-", "").lower(), "accn": r["accessionNumber"][i],
+            return {"form": form, "accn": r["accessionNumber"][i],
                     "filed": r["filingDate"][i], "period": r["reportDate"][i]}
     return None
 
