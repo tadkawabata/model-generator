@@ -8,10 +8,10 @@ paste this repo link into claude and say set this up for me
 claude reads this file and walks you through it
 
 ## claude, if someone pasted this link
-1. read SKILL.md, layout.md and pull.py from this repo
+1. read SKILL.md and pull.py from this repo
 2. point them at stockmodel.zip and template.xlsx in this repo
 3. walk them through the setup below one step at a time. dont dump it all at once
-4. if the zip is missing: put SKILL.md, layout.md, pull.py, template.xlsx, example.xlsx and readme.md in a folder called stockmodel, zip that folder, give them the zip
+4. if the zip is missing: put SKILL.md, pull.py, template.xlsx, example.xlsx and readme.md in a folder called stockmodel, zip that folder, give them the zip
 
 ## setup (once)
 1. download stockmodel.zip from this repo (click it, then the download button). dont unzip it
@@ -26,9 +26,10 @@ claude reads this file and walks you through it
 ## each new company
 1. open stockmodel template > file > make a copy. name it after the company
 2. in the copy: extensions > claude > open claude
-3. say run stockmodel check the first time, then set up <ticker>
-4. give it a contact email when it asks (see your email below)
-5. later just open that sheet and say run stockmodel. keep the sidebar open while it works
+3. say set up <ticker>
+4. if the sidebar can reach the sec, it asks for a contact email (see your email below) and does the rest
+5. if it cant (the sidebar sandbox is often offline), it asks for a csv instead. make it on your computer and drop it in (see the csv below)
+6. later just open that sheet and say run stockmodel. keep the sidebar open while it works
 
 always run it from the sidebar inside the sheet. it edits cells directly and never imports or replaces anything
 sheet text a bit off? say run stockmodel format. it only fixes text, no new numbers
@@ -38,8 +39,7 @@ the sec wants a contact email on every request, so claude asks for one at the st
 it only goes to the sec. its never saved in the sheet or in these files, so the repo has nothing personal in it
 
 ## files
-SKILL.md  what claude does when you say run stockmodel
-layout.md  what goes in each cell
+SKILL.md  what claude does when you say run stockmodel, plus what goes in each cell
 pull.py  pulls the sec numbers. python pull.py check, latest <ticker>, table <ticker>, each with --ua "stockmodel you@email.com"
 template.xlsx  the blank formatted sheet every company starts from
 example.xlsx  the same sheet with an explanation in every cell
@@ -49,7 +49,10 @@ repo changed? download stockmodel.zip again and upload it over the old skill
 changing a file? rebuild stockmodel.zip too so they match
 template changed? old sheets keep the old look. make a new copy and set it up again if you want the new one
 
-## if the sidebar cant reach the sec
-on your own computer (python 3, nothing to install):
-python pull.py table klic --ua "stockmodel you@email.com" > klic.csv
-drop the csv in the sidebar and say fill the sheet from this
+## the csv
+when the sidebar cant reach the sec, the numbers come from a csv you make on your computer (python 3, nothing to install)
+in the folder with pull.py:
+python3 pull.py table BCRX --ua "stockmodel you@email.com" > BCRX.csv
+or ask claude in a chat linked to your computer (or claude code) to make the stockmodel csv for a ticker
+drop the csv in the sidebar and say set up BCRX from this csv
+without internet the sidebar cant read the filings, so business, customers, segments, backlog and guidance stay blank until a run that can
